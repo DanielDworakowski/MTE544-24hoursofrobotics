@@ -25,18 +25,19 @@ plotEnvironment(obsPtsStore,xMin, xMax, x0, xF, fig);
 drawnow();
 figure(1); hold on;
 disp('Time to create environment');
-toc;
 
+goalIdx = -1;
 
 %% RRT, created until solution found
 tic;
 done = 0;
-milestones = [x0 0];
+milestones = [x0];
 nM = 1;
 t= 0;
 max_iters = 150;
 collision_step_size = 0.1;
-
+e = zeros(max_iters,max_iters);
+nCon = 1;
 while ((~done) && (t < max_iters))
     t=t+1;
     % Select goal location
@@ -71,7 +72,10 @@ while ((~done) && (t < max_iters))
     keep = inpolygon(samples(:,1), samples(:,2), env(:,1),env(:,2));
 
     if (sum(keep)==steps)
-        milestones = [milestones; samples(end,:) curstone];
+        milestones = [milestones; samples(end,:)];
+        nCon = nCon + 1;
+        e(curstone, nCon) = 1;
+        e(nCon,curstone) = 1;
         nM = nM+1;
         plot(samples(:,1),samples(:,2),'m');
         plot(milestones(end,1),milestones(end,2),'mo');
@@ -87,38 +91,56 @@ while ((~done) && (t < max_iters))
     keep = inpolygon(samples(:,1), samples(:,2), env(:,1),env(:,2));
 
     if (sum(keep)==steps)
-        milestones = [milestones; samples(end,:) curstone];
+        milestones = [milestones; samples(end,:)];
+        if goalIdx == -1
+          nCon = nCon + 1;
+          goalIdx = nCon;
+        end
+        e(nCon - 1, goalIdx) = 1;
+        e(goalIdx,nCon - 1) = 1;
         nM = nM+1;
         plot(samples(:,1),samples(:,2),'m');
         plot(milestones(end,1),milestones(end,2),'mo');
+%         done = 1;
+    end
+    if mod(t, 10) == 0
+      [sp, sd] = shortestpath_new(milestones, e, 1, goalIdx);
+      if ((sd - 61.55) / 61.55) < 0.05
         done = 1;
+      end
     end
 end
-
-% Find and plot final path through back tracing
-if (done)
-    done = 0;
-    cur = nM
-    curC = milestones(nM,:);
-    prev = curC(3);
-    i=2;
-    p=1;
-    dtot= 0;
-    nMiles = 0;
-    while (~done)
-        if (prev == 1)
-            done = 1;
-        end
-        plot([milestones(prev,1) milestones(cur,1)], [milestones(prev,2) milestones(cur,2)],'go','MarkerSize',6, 'LineWidth',2)
-        dtot = dtot + norm(milestones(prev,1:2)-milestones(cur,1:2));
-        nMiles = nMiles+1;
-        cur = prev;
-        curC = milestones(cur,:);
-        prev = curC(3);
-        p=p+1;
-    end
-    disp('Time to find a path');
-    toc;
-else
-    disp('No path found');
-end
+toc;
+% % Find and plot final path through back tracing
+% if (done)
+  [sp, sd] = shortestpath_new(milestones, e, 1, goalIdx);
+  sd
+  for i=1:length(sp)-1
+      plot(milestones(sp(i:i+1),1),milestones(sp(i:i+1),2), 'go-', 'LineWidth',3);
+  end
+  
+%     done = 0;
+%     cur = nM
+%     curC = milestones(nM,:);
+%     prev = curC(3);
+%     i=2;
+%     p=1;
+%     dtot= 0;
+%     nMiles = 0;
+%     while (~done)
+%         if (prev == 1)
+%             done = 1;
+%         end
+%         plot([milestones(prev,1) milestones(cur,1)], [milestones(prev,2) milestones(cur,2)],'go','MarkerSize',6, 'LineWidth',2)
+%         dtot = dtot + norm(milestones(prev,1:2)-milestones(cur,1:2));
+%         nMiles = nMiles+1;
+%         cur = prev;
+%         curC = milestones(cur,:);
+%         prev = curC(3);
+%         p=p+1;
+%     end
+%     disp('Time to find a path');
+%     toc;
+% else
+%     disp('No path found');
+% end
