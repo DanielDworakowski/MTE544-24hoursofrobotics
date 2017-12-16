@@ -1,5 +1,5 @@
 % Set up environment
-rng(1)
+rng('default')
 posMinBound = [0 0];
 posMaxBound = [50 40];
 numObsts = 70;
