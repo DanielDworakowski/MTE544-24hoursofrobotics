@@ -120,6 +120,7 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
   sMax = 30; % steps to compute for rollout
   n_traj = 15; % number of trajectories to roll out
   score_step = inf;
+  x_new = x_cur;
   for i = 1:n_traj
       % Constant speed, linear distribution of turn rates
       input = [uR(1)/2+uMin(1) uR(2)*(i-1)/(n_traj-1)+uMin(2)];
@@ -133,7 +134,6 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
       end
       idx = sub2ind(size(map), uint32(x(1,:)), uint32(x(2,:)));
       keep = map(idx) < 0.4;
-      x_new = x_cur;
       if (sum(keep)==steps)
 %           unseenScore = unseen(x(1, end), x(2, end))
           plot(x(2,:),x(1,:),'g');
@@ -147,7 +147,8 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
           score_cur = togo_cur; %- 0.1*obs_dist;
           if (score_cur < score_step)
               score_step = score_cur;
-              x_new = x(:,sMin);
+              x_cur
+              x_new = x(:,sMin)
               x_plot = x;
           end
       else
@@ -155,7 +156,9 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
       end
   end
   % Check if no progress is made
+  
   if (x_new==x_cur)
+      x_new
       x_new(3)=x_new(3)-0.1;
   else
       plot(x_plot(2,:),x_plot(1,:),'b');
