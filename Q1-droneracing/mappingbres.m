@@ -37,22 +37,12 @@ x(:,1) = x0;
 dt = 1/5; 
 
 goal0 = [440 642];
-
+unseen = ones(size(map));
 
 %% Main simulation
 for t=2:length(T)
     % Robot motion
-%     move = x(1:2,t-1) + u(:,ui);
-%     if ((move(1)>M||move(2)>N||move(1)<1||move(2)<1) || (map(move(1),move(2))==1))
-%         x(:,t) = x(:,t-1);
-%         ui = mod(ui,4)+1;
-%     else
-%         x(1:2,t) = move;
-%     end
-%     x(3,t) = x(3,t-1) + w(t);
-%    
-%     x(:,t) = motModel(x(:,t-1), 1, deg2rad(30), dt);
-    x(:,t) =  trajRoll(x(:,t - 1), m, goal0);
+    x(:,t) =  trajRoll(x(:,t - 1), m, goal0, unseen);
     % Generate a measurement data set
     meas_r = getranges(map, x(:,t),meas_phi,rmax, rmin);
 
@@ -70,6 +60,7 @@ for t=2:length(T)
               % Calculate updated log odds
               L(ix,iy) = L(ix,iy) +log(il./(1-il))-L0(ix,iy);
               measL(ix,iy)= measL(ix,iy) +log(il./(1-il))-L0(ix,iy);
+              unseen(ix, iy) = 0;
           end
         end
     end
@@ -98,17 +89,16 @@ for t=2:length(T)
 %     %F2(t-1) = getframe;
 %     title('Measurements and inverse measurement model');
 
-%     % Belief map
-%     figure(3);clf; hold on;
-%     image(100*(m));
-%     colormap(gray);
-%     plot(x(2,max(1,t-10):t),x(1,max(1,t-10):t),'bx-')
-%     axis([0 N 0 M])
-%     %F3(t-1) = getframe;
-%     title('Current occupancy grid map')
+    % Belief map
+    figure(3);clf; hold on;
+    image(100*(m));
+    colormap(gray);
+    plot(x(2,max(1,t-10):t),x(1,max(1,t-10):t),'bx-')
+    axis([0 N 0 M])
+    %F3(t-1) = getframe;
+    title('Current occupancy grid map')
 
 end
-
 
 function [x_plus] = motModel(x, v, theta, dt)
   if (abs(v) > 20)
@@ -121,10 +111,10 @@ function [x_plus] = motModel(x, v, theta, dt)
   x_plus(3) = angleWrap(theta);
 end
 
-function [x_new] = trajRoll(x_cur, map, xF)
+function [x_new] = trajRoll(x_cur, map, xF, unseen)
   dt = 1/5;
-  uMin = [0.3 -2]; % bounds on inputs, [velocity, rotation rate]
-  uMax = [0.3 2]; % bounds on inputs, [velocity, rotation rate]
+  uMin = [0.3 -2 + x_cur(3)]; % bounds on inputs, [velocity, rotation rate]
+  uMax = [0.3 2 + x_cur(3)]; % bounds on inputs, [velocity, rotation rate]
   uR = uMax-uMin; % range of inputs
   sMin = 10; % steps to move
   sMax = 30; % steps to compute for rollout
@@ -141,11 +131,11 @@ function [x_new] = trajRoll(x_cur, map, xF)
 %           x(:, j) = x(:,j-1)+[input(1)*cos(x(3,j-1))*dt; input(1)*sin(x(3,j-1))*dt; input(2)*dt]
           x(:, j) = motModel(x(:, j-1), input(1), input(2), dt);
       end
-      x
       idx = sub2ind(size(map), uint32(x(1,:)), uint32(x(2,:)));
       keep = map(idx) < 0.4;
       x_new = x_cur;
       if (sum(keep)==steps)
+%           unseenScore = unseen(x(1, end), x(2, end))
           plot(x(2,:),x(1,:),'g');
           % Score the trajectory
           togo_cur = norm(x(end,1:2)-xF);
