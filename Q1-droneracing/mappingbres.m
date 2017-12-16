@@ -2,7 +2,7 @@
 clear; clc;
 
 % Simulation time
-Tmax = 150;
+Tmax = 9999;
 T = 0:Tmax;
 
 % Initial Robot location
@@ -38,11 +38,13 @@ dt = 1/5;
 
 goal0 = [440 642];
 unseen = ones(size(map));
+frontier = zeros(size(map));
+
 
 %% Main simulation
 for t=2:length(T)
     % Robot motion
-    x(:,t) =  trajRoll(x(:,t - 1), m, goal0, unseen);
+    x(:,t) =  trajRoll(x(:,t - 1), m, goal0, unseen,frontier);
     % Generate a measurement data set
     meas_r = getranges(map, x(:,t),meas_phi,rmax, rmin);
 
@@ -53,7 +55,12 @@ for t=2:length(T)
         % Get inverse measurement model
         invmod = inversescannerbres(M,N,x(1,t),x(2,t),meas_phi(i)+x(3,t),meas_r(i),rmax);
         if (~isempty(invmod))
-          for j = 1:length(invmod(:,1))
+          
+          sz = length(invmod(:,1));
+          if meas_r(i) == rmax
+            sz = sz - 1;
+          end
+          for j = 1:sz
               ix = invmod(j,1);
               iy = invmod(j,2);
               il = invmod(j,3);
@@ -61,6 +68,17 @@ for t=2:length(T)
               L(ix,iy) = L(ix,iy) +log(il./(1-il))-L0(ix,iy);
               measL(ix,iy)= measL(ix,iy) +log(il./(1-il))-L0(ix,iy);
               unseen(ix, iy) = 0;
+              frontier(ix, iy) = 0;
+          end
+          if meas_r(i) == rmax
+            sz = sz + 1;
+            ix = invmod(sz,1);
+            iy = invmod(sz,2);
+            il = invmod(sz,3);
+            L(ix,iy) = L(ix,iy) +log(il./(1-il))-L0(ix,iy);
+            measL(ix,iy)= measL(ix,iy) +log(il./(1-il))-L0(ix,iy);
+            frontier(ix, iy) = 1 * unseen(ix,iy);
+
           end
         end
     end
@@ -111,7 +129,7 @@ function [x_plus] = motModel(x, v, theta, dt)
   x_plus(3) = angleWrap(theta);
 end
 
-function [x_new] = trajRoll(x_cur, map, xF, unseen)
+function [x_new] = trajRoll(x_cur, map, xF, unseen, frontier)
   dt = 1/5;
   uMin = [0.3 -2 + x_cur(3)]; % bounds on inputs, [velocity, rotation rate]
   uMax = [0.3 2 + x_cur(3)]; % bounds on inputs, [velocity, rotation rate]
@@ -121,6 +139,8 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
   n_traj = 15; % number of trajectories to roll out
   score_step = inf;
   x_new = x_cur;
+  checkLength = 5;
+  [frontRows, frontCols] = find(frontier);
   for i = 1:n_traj
       % Constant speed, linear distribution of turn rates
       input = [uR(1)/2+uMin(1) uR(2)*(i-1)/(n_traj-1)+uMin(2)];
@@ -135,22 +155,28 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
       idx = sub2ind(size(map), uint32(x(1,:)), uint32(x(2,:)));
       keep = map(idx) < 0.4;
       if (sum(keep)==steps)
-%           unseenScore = unseen(x(1, end), x(2, end))
-          plot(x(2,:),x(1,:),'g');
-          % Score the trajectory
-          togo_cur = norm(x(end,1:2)-xF);
-%           obs_dist = inf;
-%           for k = 1:nO
-%               obs_dist = min(obs_dist,Dist2Poly(x(end,1),x(end,2),obsEdges(((k-1)*4)+1:4*k,1),obsEdges(((k-1)*4)+1:4*k,2)));
-%           end
-%           obs_dist;
-          score_cur = togo_cur; %- 0.1*obs_dist;
-          if (score_cur < score_step)
-              score_step = score_cur;
-              x_cur
-              x_new = x(:,sMin)
-              x_plot = x;
-          end
+
+        iX = x(1,end);
+        iY = x(2,end);
+        dist = 0;
+        if ~isempty(frontRows)
+          dist = min(norm([frontRows - iY, frontCols - iX]))
+        end
+         
+        
+%         
+%         unseenScore = unseen(x(1, end), x(2, end))
+        plot(x(2,:),x(1,:),'g');
+        % Score the trajectory
+        togo_cur = norm(x(end,1:2)-xF) - 0.1*dist;
+
+        score_cur = togo_cur ; %- 0.1*obs_dist;
+        if (score_cur < score_step)
+            score_step = score_cur;
+
+            x_new = x(:,sMin);
+            x_plot = x;
+        end
       else
           plot(x(2,:),x(1,:),'r');
       end
@@ -158,7 +184,6 @@ function [x_new] = trajRoll(x_cur, map, xF, unseen)
   % Check if no progress is made
   
   if (x_new==x_cur)
-      x_new
       x_new(3)=x_new(3)-0.1;
   else
       plot(x_plot(2,:),x_plot(1,:),'b');
