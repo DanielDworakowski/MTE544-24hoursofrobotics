@@ -1,4 +1,4 @@
-function meas_r = getranges(map,X,meas_phi, rmax, rmin)
+function meas_r = getranges(map,X,meas_phi, rmax)
 % Generate range measurements for a laser scanner based on a map, vehicle
 % position and sensor parameters.
 % Rough implementation of ray tracing algorithm.
@@ -28,7 +28,7 @@ for i=1:length(meas_phi)
        % stop going further
        elseif (map(xi,yi))
            meas_r(i) = r;
-           if (r < rmin)
+                      if (r < rmin)
              meas_r(i) = -1;
            end
            break;

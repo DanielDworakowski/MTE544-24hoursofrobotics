@@ -25,8 +25,9 @@ L0 = log(m./(1-m));
 L=L0;
 
 % Sensor model parameters
-meas_phi = [-.4:0.01:.4]; % Measurement headings
-rmax = 30; % Max range
+meas_phi = linspace(deg2rad(-69/2), deg2rad(69/2), 128);
+rmax = 10 / dxy; % Max range
+rmin = 0.3 / dxy;
 alpha = 1; % Width of an obstacle (Distance about measurement to fill in)
 beta = 0.05; % Width of a beam (Angle beyond which to exclude) 
 
@@ -38,8 +39,7 @@ x(:,1) = x0;
 %% Main simulation
 for t=2:length(T)
     % Robot motion
-    display('here')
-    move =  x(1:2,t-1) + u(:,ui)
+    move = x(1:2,t-1) + u(:,ui);
     if ((move(1)>M||move(2)>N||move(1)<1||move(2)<1) || (map(move(1),move(2))==1))
         x(:,t) = x(:,t-1);
         ui = mod(ui,4)+1;
@@ -49,7 +49,7 @@ for t=2:length(T)
     x(3,t) = x(3,t-1) + w(t);
     
     % Generate a measurement data set
-    meas_r = getranges(map,x(:,t),meas_phi,rmax);
+    meas_r = getranges(map,x(:,t),meas_phi,rmax, rmin);
 
 
     %% Map update
@@ -57,13 +57,15 @@ for t=2:length(T)
     for i = 1:length(meas_phi)
         % Get inverse measurement model
         invmod = inversescannerbres(M,N,x(1,t),x(2,t),meas_phi(i)+x(3,t),meas_r(i),rmax);
-        for j = 1:length(invmod(:,1));
-            ix = invmod(j,1);
-            iy = invmod(j,2);
-            il = invmod(j,3);
-            % Calculate updated log odds
-            L(ix,iy) = L(ix,iy) +log(il./(1-il))-L0(ix,iy);
-            measL(ix,iy)= measL(ix,iy) +log(il./(1-il))-L0(ix,iy);
+        if (~isempty(invmod))
+          for j = 1:length(invmod(:,1))
+              ix = invmod(j,1);
+              iy = invmod(j,2);
+              il = invmod(j,3);
+              % Calculate updated log odds
+              L(ix,iy) = L(ix,iy) +log(il./(1-il))-L0(ix,iy);
+              measL(ix,iy)= measL(ix,iy) +log(il./(1-il))-L0(ix,iy);
+          end
         end
     end
     % Calculate probabilities

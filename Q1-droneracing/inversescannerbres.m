@@ -17,5 +17,7 @@ m = [list 0.4*ones(length(list),1)];
 if (r<rmax)
     m(end,3) = 0.6;
 end
-
+if (r < 0)
+  m = [];
+end
 
