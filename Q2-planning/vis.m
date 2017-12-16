@@ -55,3 +55,25 @@ for i=1:n
     end
 end
 toc;
+
+%%
+
+% Find shortest path
+tic;
+[sp, sd] = shortestpath_new(D, A, startPos, endPos,  1, 1,0);
+for i=1:length(sp)-1
+    plot(milestones(sp(i:i+1),1),milestones(sp(i:i+1),2), 'go-', 'LineWidth',3);
+end
+disp('Time to find shortest path');
+toc;
+
+
+
+
+
+
+
+
+
+
+
