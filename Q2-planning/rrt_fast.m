@@ -34,7 +34,7 @@ done = 0;
 milestones = [x0];
 nM = 1;
 t= 0;
-max_iters = 150;
+max_iters = 1000;
 collision_step_size = 0.1;
 e = zeros(max_iters,max_iters);
 nCon = 1;
@@ -92,9 +92,9 @@ while ((~done) && (t < max_iters))
 
     if (sum(keep)==steps)
         milestones = [milestones; samples(end,:)];
+                  nCon = nCon + 1;
         if goalIdx == -1
-          nCon = nCon + 1;
-          goalIdx = nCon;
+          goalIdx = nCon
         end
         e(nCon - 1, goalIdx) = 1;
         e(goalIdx,nCon - 1) = 1;
@@ -103,8 +103,13 @@ while ((~done) && (t < max_iters))
         plot(milestones(end,1),milestones(end,2),'mo');
 %         done = 1;
     end
-    if mod(t, 10) == 0
+    if mod(t, 50) == 0
+      if goalIdx == -1
+        continue
+      end
       [sp, sd] = shortestpath_new(milestones, e, 1, goalIdx);
+      t
+      sd
       if ((sd - 61.55) / 61.55) < 0.05
         done = 1;
       end
