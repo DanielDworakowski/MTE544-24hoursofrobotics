@@ -36,8 +36,6 @@ x = zeros(3,length(T)+1);
 x(:,1) = x0;
 dt = 1/5; 
 
-goal0 = [440 642];
-
 
 %% Main simulation
 for t=2:length(T)
@@ -52,7 +50,7 @@ for t=2:length(T)
 %     x(3,t) = x(3,t-1) + w(t);
 %    
 %     x(:,t) = motModel(x(:,t-1), 1, deg2rad(30), dt);
-    x(:,t) =  trajRoll(x(:,t - 1), m, goal0);
+    x(:,t) =  trajRoll(x(:,t - 1), m);
     % Generate a measurement data set
     meas_r = getranges(map, x(:,t),meas_phi,rmax, rmin);
 
@@ -86,26 +84,26 @@ for t=2:length(T)
     plot(x(2,1:t),x(1,1:t),'bx-')
     axis([0 N 0 M])
 
-%     % Inverse measurement model
-%     figure(2);clf; hold on;
-%     image(100*(invmod_T));
-%     colormap(gray);
-%     plot(x(2,t),x(1,t),'bx')
-%     for i=1:length(meas_r)
-%         plot( x(2,t)+meas_r(i)*sin(meas_phi(i) + x(3,t)),x(1,t)+meas_r(i)*cos(meas_phi(i)+ x(3,t)),'ko')
-%     end
-%     axis([0 N 0 M])
-%     %F2(t-1) = getframe;
-%     title('Measurements and inverse measurement model');
+    % Inverse measurement model
+    figure(2);clf; hold on;
+    image(100*(invmod_T));
+    colormap(gray);
+    plot(x(2,t),x(1,t),'bx')
+    for i=1:length(meas_r)
+        plot( x(2,t)+meas_r(i)*sin(meas_phi(i) + x(3,t)),x(1,t)+meas_r(i)*cos(meas_phi(i)+ x(3,t)),'ko')
+    end
+    axis([0 N 0 M])
+    %F2(t-1) = getframe;
+    title('Measurements and inverse measurement model');
 
-%     % Belief map
-%     figure(3);clf; hold on;
-%     image(100*(m));
-%     colormap(gray);
-%     plot(x(2,max(1,t-10):t),x(1,max(1,t-10):t),'bx-')
-%     axis([0 N 0 M])
-%     %F3(t-1) = getframe;
-%     title('Current occupancy grid map')
+    % Belief map
+    figure(3);clf; hold on;
+    image(100*(m));
+    colormap(gray);
+    plot(x(2,max(1,t-10):t),x(1,max(1,t-10):t),'bx-')
+    axis([0 N 0 M])
+    %F3(t-1) = getframe;
+    title('Current occupancy grid map')
 
 end
 
@@ -118,16 +116,16 @@ function [x_plus] = motModel(x, v, theta, dt)
   x_plus = x; 
   x_plus(1) = x_plus(1) + v * cos(x(3)) * dt; 
   x_plus(2) = x_plus(2) + v * sin(x(3)) * dt; 
-  x_plus(3) = angleWrap(theta);
+  x_plus(3) = theta;
 end
 
-function [x_new] = trajRoll(x_cur, map, xF)
+function [x_new] = trajRoll(x_cur, map)
   dt = 1/5;
-  uMin = [0.3 -2]; % bounds on inputs, [velocity, rotation rate]
-  uMax = [0.3 2]; % bounds on inputs, [velocity, rotation rate]
+  uMin = [2 -2]; % bounds on inputs, [velocity, rotation rate]
+  uMax = [2 2]; % bounds on inputs, [velocity, rotation rate]
   uR = uMax-uMin; % range of inputs
   sMin = 10; % steps to move
-  sMax = 30; % steps to compute for rollout
+  sMax = 50; % steps to compute for rollout
   n_traj = 15; % number of trajectories to roll out
   score_step = inf;
   for i = 1:n_traj
@@ -136,45 +134,38 @@ function [x_new] = trajRoll(x_cur, map, xF)
       steps = sMax; 
 
       % Propagate Dynamics
-      x = x_cur;
+      x = x_cur
       for j=2:steps
 %           x(:, j) = x(:,j-1)+[input(1)*cos(x(3,j-1))*dt; input(1)*sin(x(3,j-1))*dt; input(2)*dt]
           x(:, j) = motModel(x(:, j-1), input(1), input(2), dt);
       end
-      x
-      idx = sub2ind(size(map), uint32(x(1,:)), uint32(x(2,:)));
-      keep = map(idx) < 0.4;
-      x_new = x_cur;
+      keep = map(uint32(x(1,:)), uint32(x(2,:)))
+
       if (sum(keep)==steps)
-          plot(x(2,:),x(1,:),'g');
+          plot(x(:,1),x(:,2),'g');
           % Score the trajectory
           togo_cur = norm(x(end,1:2)-xF);
-%           obs_dist = inf;
-%           for k = 1:nO
-%               obs_dist = min(obs_dist,Dist2Poly(x(end,1),x(end,2),obsEdges(((k-1)*4)+1:4*k,1),obsEdges(((k-1)*4)+1:4*k,2)));
-%           end
-%           obs_dist;
-          score_cur = togo_cur; %- 0.1*obs_dist;
+          obs_dist = inf;
+          for k = 1:nO
+              obs_dist = min(obs_dist,Dist2Poly(x(end,1),x(end,2),obsEdges(((k-1)*4)+1:4*k,1),obsEdges(((k-1)*4)+1:4*k,2)));
+          end
+          obs_dist;
+          score_cur = togo_cur - 0.1*obs_dist;
           if (score_cur < score_step)
               score_step = score_cur;
               x_new = x(:,sMin);
               x_plot = x;
           end
       else
-          plot(x(2,:),x(1,:),'r');
+          plot(x(:,1),x(:,2),'r');
       end
   end
   % Check if no progress is made
   if (x_new==x_cur)
       x_new(3)=x_new(3)-0.1;
   else
-      plot(x_plot(2,:),x_plot(1,:),'b');
-      plot(x_plot(2,end),x_plot(1,end),'bo');
+      plot(x_plot(:,1),x_plot(:,2),'b');
+      plot(x_plot(end,1),x_plot(end,2),'bo');
   end
   drawnow;
-end
-
-function [wrapped_angle] = angleWrap(angle)
-
-wrapped_angle = mod(angle + pi, 2*pi) - pi;
 end
