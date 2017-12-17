@@ -3,10 +3,15 @@ run('warehouse.m');
 
 newfeature_known = ones(4,1);
 newfeature_unknown = ones(200,1);
-mufeat_known = known_fiducials;
-S0feat_known = zeros(4);
+mufeat_known = zeros(2*4,1);
+S0feat_known = zeros(2*4);
 
+for i=1:4
+  mufeat_known((2*(i-1)+1):(2*i)) = known_fiducials(i,:).'; 
+end
 
+mufeat_unknown = zeros(2*200,1);
+S0feat_unknown = 0.1*eye(2*200);
 
 
 % Fixed vehicle parameters
@@ -43,8 +48,15 @@ end
 % xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
 x = zeros(length(T),5);  % State ([e psi] 
 x(1,:) = [x0_r; 5; 0]; % Initial condition
-delta = zeros(length(T),1); % Steering angles
+s_rr = eye(5) * 4;
+s_rr(4) = 0;
+s_rr(5) = 0;
 
+
+% Construct overall mean and variances. 
+mu = [x(1,:).'; mufeat_known; mufeat_unknown];
+S = [s_rr zeros(4,4)
+%%
 % figure(1);clf; hold on;
 hold on;
 % axis([-10 10 -10 10]);
@@ -52,17 +64,17 @@ for t=1:length(T)-1
     end_point = traj_points(traj_point_counter+1, :);
     start_point = traj_points(traj_point_counter, :);
     
-    [x(t+1,:), next_point] = motModel(x(t,:), start_point, end_point, v, dt);
+    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt);
  
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
     %
-    testY = y_unknown + x(t+1, 1:2);
-    for i=1:length(flistunknown)
-      if (flistunknown(i))
-        plot(testY(i,1), testY(i,2), 'm*')
-      end
-    end
+%     testY = y_unknown + x(t+1, 1:2);
+%     for i=1:length(flistunknown)
+%       if (flistunknown(i))
+%         plot(testY(i,1), testY(i,2), 'm*')
+%       end
+%     end
     
     % Check if we have travelled the distance of the line segment. 
     % If we have, then get the next point
@@ -76,6 +88,7 @@ for t=1:length(T)-1
     plot(x(1:t,1),x(1:t,2),'bo');
 
   drawnow
+  clear y_known y_unknown flistknown flistunknown a;
 end
 
 %% Plotting
@@ -166,10 +179,12 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     a(2,4) = dt * sin(x(3));
     a(3,4) = dt * tan(delta/robot_length);
     a(4,4) = -kp;
-    a(5,4) = -1;
-    x_plus = a * x.'
-    x_plus(4) = (x(4)-5) * kp + ki * x(5);
-    x_plus(5) = 5 + x_plus(5)
+    a(4,5) = -ki;
+    a(5,4) = 1;
+    a(5,5) = -1;
+    x_plus = a * x.';
+    x_plus(4) = x_plus(4) +  5 * kp + ki * x(5);
+    x_plus(5) = 5*kp + x_plus(5);
 
 
     % angle wrap the heading + noise.

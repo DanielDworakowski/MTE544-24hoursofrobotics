@@ -3,10 +3,15 @@ run('warehouse.m');
 
 newfeature_known = ones(4,1);
 newfeature_unknown = ones(200,1);
-mufeat_known = known_fiducials;
-S0feat_known = zeros(4);
+mufeat_known = zeros(2*4,1);
+S0feat_known = zeros(2*4);
 
+for i=1:4
+  mufeat_known((2*(i-1)+1):(2*i)) = known_fiducials(i,:).'; 
+end
 
+mufeat_unknown = zeros(2*200,1);
+S0feat_unknown = 100*eye(2*200);
 
 
 % Fixed vehicle parameters
@@ -26,7 +31,7 @@ x0_r = [x0; 0];
 
 % Simulation time
 Tmax = 80;  % End point
-dt =0.1; % Time step
+dt =0.05; % Time step
 T = 0:dt:Tmax; % Time vector
 
 nO = 4;
@@ -43,8 +48,16 @@ end
 % xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
 x = zeros(length(T),5);  % State ([e psi] 
 x(1,:) = [x0_r; 5; 0]; % Initial condition
-delta = zeros(length(T),1); % Steering angles
+s_rr = eye(5) * 4;
+s_rr(4,4) = 0;
+s_rr(5,5) = 0;
 
+
+% Construct overall mean and variances. 
+mu = [x(1,:).'; mufeat_known; mufeat_unknown];
+S = [s_rr zeros(5,2*4); zeros(2*4,5) S0feat_known];
+S = [S zeros(5+8, 400); zeros(400, 5+8) S0feat_unknown];
+%%
 % figure(1);clf; hold on;
 hold on;
 % axis([-10 10 -10 10]);
