@@ -74,7 +74,7 @@ for t=1:length(T)-1
     start_point = traj_points(traj_point_counter, :);
     
 
-    [x(t+1,:), next_point, a, v] = motModel(x(t,:), start_point, end_point, v, dt, n, mu(1:n),false);
+    [x(t+1,:), ~, a, v] = motModel(x(t,:), start_point, end_point, v, dt, n, mu(1:n),false);
     x(t+1,:);
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
@@ -96,7 +96,7 @@ for t=1:length(T)-1
 %%
 % motion cov update.
 % mu(1:5) = x(t+1,:).';
-[mu(1:n), ~, a, v] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu,true);
+[mu(1:n), next_point, a, v] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu,true);
 S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
 % Measurement update. 
     for i=1:204
@@ -279,7 +279,7 @@ end
 function [x_plus, next_point, a,v ] = motModel(x, start_point, end_point, v,dt,n, mu, vcont)
     % The desired trajectory is a line segment consisting of 2 points from
     % the desired trajectory
-    delta_max = 100*pi/180; % max steering angle
+    delta_max = 25*pi/180; % max steering angle
     k = 2.5; % Gain
     kp = 1;
     ki = 0.01;
@@ -291,7 +291,7 @@ function [x_plus, next_point, a,v ] = motModel(x, start_point, end_point, v,dt,n
 %     CALCULATE ALL COMMANDS BASED ON mu.
 %     v = mu(4);
 %     v = 5;
-    traj_angle = atan2(end_point(2) - start_point(2), end_point(1) - start_point(1));
+    traj_angle = atan2(end_point(2) - x(2), end_point(1) - start_point(1));
     
     [crosstrack_error, next_point] = distanceToLineSegment(start_point,end_point,mu(1:2).');
     
