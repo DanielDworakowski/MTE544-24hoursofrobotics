@@ -96,7 +96,7 @@ for t=1:length(T)-1
 %%
 % motion cov update.
 % mu(1:5) = x(t+1,:).';
-[mu(1:n), next_point, a, v] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu,true);
+[mu(1:n), ~, a, v] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu,true);
 S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
 % Measurement update. 
     for i=1:204
@@ -182,25 +182,26 @@ S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
     %plot(trees(:,1),trees(:,2),'go', 'MarkerSize',10,'LineWidth',2);
 %     plot(xr(1,1:t),xr(3,1:t), 'ro--')
 %     plot([xr(1,t) xr(1,t)+1*cos(yaw)],[xr(3,t) xr(3,t)+1*sin(yaw)], 'r-')
-    plot(mu(1),mu(2), 'rx')
-    %plot([mu_S(1,t) mu_S(1,t)+1*cos(yaw)],[mu_S(3,t) mu_S(3,t)+1*sin(yaw)], 'b-')
+%     plot(mu(1),mu(2), 'rx')
+%     clf
+% %     %plot([mu_S(1,t) mu_S(1,t)+1*cos(yaw)],[mu_S(3,t) mu_S(3,t)+1*sin(yaw)], 'b-')
     mu_pos = [mu(1) mu(2)];
     S_pos = [S(1,1) S(1,2); S(2,1) S(2,2)];
     error_ellipse(S_pos,mu_pos,0.75);
     error_ellipse(S_pos,mu_pos,0.95);
 %     plot( [mu(1) mu(1)+2*cos(phides)],[mu(3) mu(3)+2*sin(phides)], 'b')
-    for i=1:204
-        if (flist(i))
-            fi = 2*(i-1)+1;
-            fj = 2*i;
-%             testY = y_unknown + x0.'
-%             plot([mu(1) mu(1)+rxy*cos(y(fj,t)+yaw)], [mu(3) mu(3)+rxy*sin(y(fj,t)+yaw)], 'c');
-            plot(mu(5+fi),mu(5+fj), 'gx')
-            mu_pos = [mu(n+fi) mu(n+fj)];
-            S_pos = [S(n+fi,n+fi) S(n+fi,n+fj); S(n+fj,5+fi) S(n+fj,n+fj)];
-            error_ellipse(S_pos,mu_pos,0.95);
-        end
-    end
+%     for i=1:204
+%         if (flist(i))
+%             fi = 2*(i-1)+1;
+%             fj = 2*i;
+% %             testY = y_unknown + x0.'
+% %             plot([mu(1) mu(1)+rxy*cos(y(fj,t)+yaw)], [mu(3) mu(3)+rxy*sin(y(fj,t)+yaw)], 'c');
+%             plot(mu(5+fi),mu(5+fj), 'gx')
+%             mu_pos = [mu(n+fi) mu(n+fj)];
+%             S_pos = [S(n+fi,n+fi) S(n+fi,n+fj); S(n+fj,5+fi) S(n+fj,n+fj)];
+%             error_ellipse(S_pos,mu_pos,0.95);
+%         end
+%     end
 %     axis equal
 %     axis([-4 6 -1 7])
     title('SLAM with Range & Bearing Measurements')
@@ -278,7 +279,7 @@ end
 function [x_plus, next_point, a,v ] = motModel(x, start_point, end_point, v,dt,n, mu, vcont)
     % The desired trajectory is a line segment consisting of 2 points from
     % the desired trajectory
-    delta_max = 25*pi/180; % max steering angle
+    delta_max = 100*pi/180; % max steering angle
     k = 2.5; % Gain
     kp = 1;
     ki = 0.01;
@@ -322,7 +323,7 @@ function [x_plus, next_point, a,v ] = motModel(x, start_point, end_point, v,dt,n
     x_plus = a * x.';
     x_plus(1) = x_plus(1) + v * dt * cos(x(3));
     x_plus(2) = x_plus(2) + v * dt * sin(x(3));
-    x_plus(3) = x_plus(3) + dt * tan(delta/robot_length);
+    x_plus(3) = x_plus(3) + dt * v * tan(delta/robot_length);
 %     x_plus(4) = 5 + kp*(5-x(4)); % + ki * x(5);
 %     x_plus(5) = x_plus(5) + ki * (5 - x(4));
 

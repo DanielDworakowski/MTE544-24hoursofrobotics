@@ -45,7 +45,7 @@ while ((~done) && (t < max_iters))
     % Uniform with growth factor - not in obstacle
     goal_found = false;
     while (~goal_found)
-        growth_factor = 2*(t+50)/(max_iters+100);
+        growth_factor = 2*(t+50)/((max_iters/10)+100);
         cur_goal = (1-growth_factor)*x0 + growth_factor * xR.*rand(1,2);
         if (inpolygon(cur_goal(1), cur_goal(2), env(:,1), env(:,2)))
             goal_found = true;
