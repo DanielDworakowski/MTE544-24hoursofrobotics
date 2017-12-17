@@ -46,16 +46,10 @@ while ((~done) && (t < max_iters))
     % Select goal location
     % Uniform with growth factor - not in obstacle
     goal_found = false;
-    growBase = t;
     while (~goal_found)
         
-        growth_factor = 2*(t+50)/(max_iters+100);
+        growth_factor = 2*(t+50)/((max_iters/10)+100);
         cur_goal = (1-growth_factor)*x0 + growth_factor * xR.*rand(1,2);
-        if (discretization(uint32(dx*cur_goal)) == 1)
-          continue
-        else
-          discretization(uint32(dx*cur_goal)) = 1;
-        end
         if (inpolygon(cur_goal(1), cur_goal(2), env(:,1), env(:,2)))
             goal_found = true;
         end
@@ -82,6 +76,12 @@ while ((~done) && (t < max_iters))
     keep = inpolygon(samples(:,1), samples(:,2), env(:,1),env(:,2));
 
     if (sum(keep)==steps)
+        
+        if (discretization(uint32(dx*samples(end,:))+ 1) == 1)
+          continue
+        else
+          discretization(uint32(dx*samples(end,:)) + 1) = 1;
+        end
         milestones = [milestones; samples(end,:)];
         nCon = nCon + 1;
         e(curstone, nCon) = 1;
