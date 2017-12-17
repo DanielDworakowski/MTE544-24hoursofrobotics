@@ -40,9 +40,9 @@ for i=9:(length(warehouse_map) -1)
 end
 %%
 % Simulation setup
-xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
-x = zeros(length(T),3);  % State ([e psi] 
-x(1,:) = x0_r; % Initial condition
+% xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
+x = zeros(length(T),5);  % State ([e psi] 
+x(1,:) = [x0_r; 5; 0]; % Initial condition
 delta = zeros(length(T),1); % Steering angles
 
 % figure(1);clf; hold on;
@@ -52,17 +52,17 @@ for t=1:length(T)-1
     end_point = traj_points(traj_point_counter+1, :);
     start_point = traj_points(traj_point_counter, :);
     
-    [x(t+1,:), next_point] = motModel(x(t,:), start_point, end_point, v, dt);
+    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt);
  
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
     %
-    testY = y_unknown + x(t+1, 1:2);
-    for i=1:length(flistunknown)
-      if (flistunknown(i))
-        plot(testY(i,1), testY(i,2), 'm*')
-      end
-    end
+%     testY = y_unknown + x(t+1, 1:2);
+%     for i=1:length(flistunknown)
+%       if (flistunknown(i))
+%         plot(testY(i,1), testY(i,2), 'm*')
+%       end
+%     end
     
     % Check if we have travelled the distance of the line segment. 
     % If we have, then get the next point
@@ -76,6 +76,7 @@ for t=1:length(T)-1
     plot(x(1:t,1),x(1:t,2),'bo');
 
   drawnow
+  clear y_known y_unknown flistknown flistunknown a;
 end
 
 %% Plotting
@@ -130,13 +131,17 @@ end
 %%
 
 
-function [x_plus, next_point] = motModel(x, start_point, end_point, v,dt)
+function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     % The desired trajectory is a line segment consisting of 2 points from
     % the desired trajectory
     delta_max = 25*pi/180; % max steering angle
     k = 2.5; % Gain
+    kp = 1;
+    ki = 1;
     robot_length = 1; % Car length
 
+    v = x(4);
+    
     traj_angle = atan2(end_point(2) - start_point(2), end_point(1) - start_point(1));
     
     [crosstrack_error, next_point] = distanceToLineSegment(start_point,end_point,x(1:2));
@@ -144,15 +149,32 @@ function [x_plus, next_point] = motModel(x, start_point, end_point, v,dt)
     % Calculate steering angle
     delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - x(3))+ atan2(-k*crosstrack_error,v)));
     % State derivatives
-    xd(1) = v*cos(x(3));
-    xd(2) = v*sin(x(3));
-    xd(3) = v*tan(delta/robot_length);
-    
+%     xd(1) = v*cos(x(3));
+%     xd(2) = v*sin(x(3));
+%     xd(3) = v*tan(delta/robot_length);
+%     
     % State update
-    x_plus(1) = x(1)+dt*xd(1);
-    x_plus(2) = x(2)+dt*xd(2);
-    x_plus(3) = x(3)+dt*xd(3);
-    
+%     x_plus(1) = x(1)+dt*xd(1);
+%     x_plus(2) = x(2)+dt*xd(2);
+%     x_plus(3) = x(3)+dt*xd(3);
+%     x_plus(4) = x(4);
+%     x_plus(5) = x(4);
+
+    a = eye(5);
+    a(1,3) = -dt * x(4) * sin(x(3));
+    a(1,4) = dt * cos(x(3));
+    a(2,3) = dt * x(4) * cos(x(3));
+    a(2,4) = dt * sin(x(3));
+    a(3,4) = dt * tan(delta/robot_length);
+    a(4,4) = -kp;
+    a(4,5) = -ki;
+    a(5,4) = 1;
+    a(5,5) = -1;
+    x_plus = a * x.';
+    x_plus(4) = x_plus(4) +  5 * kp + ki * x(5);
+    x_plus(5) = 5*kp + x_plus(5);
+
+
     % angle wrap the heading + noise.
     x_plus(1) = x_plus(1) + 0.02 * randn();
     x_plus(2) = x_plus(2) + 0.02 * randn();
