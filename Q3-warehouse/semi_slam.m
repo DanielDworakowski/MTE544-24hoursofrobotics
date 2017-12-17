@@ -68,13 +68,13 @@ S = [S zeros(n+8, 400); zeros(400, n+8) S0feat_unknown];
 % figure(1);clf; hold on;
 hold on;
 % axis([-10 10 -10 10]);
+sumV = 0;
 for t=1:length(T)-1
     end_point = traj_points(traj_point_counter+1, :);
     start_point = traj_points(traj_point_counter, :);
     
-    v
-    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt, n, mu(1:n));
-    display('asssad'); 
+
+    [x(t+1,:), next_point, a, v] = motModel(x(t,:), start_point, end_point, v, dt, n, mu(1:n),false);
     x(t+1,:);
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
@@ -96,7 +96,7 @@ for t=1:length(T)-1
 %%
 % motion cov update.
 % mu(1:5) = x(t+1,:).';
-[mu(1:n), next_point, a] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu);
+[mu(1:n), next_point, a, v] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu,true);
 S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
 % Measurement update. 
     for i=1:204
@@ -196,8 +196,8 @@ S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
 %             testY = y_unknown + x0.'
 %             plot([mu(1) mu(1)+rxy*cos(y(fj,t)+yaw)], [mu(3) mu(3)+rxy*sin(y(fj,t)+yaw)], 'c');
             plot(mu(5+fi),mu(5+fj), 'gx')
-            mu_pos = [mu(5+fi) mu(5+fj)];
-            S_pos = [S(5+fi,5+fi) S(5+fi,5+fj); S(5+fj,5+fi) S(5+fj,5+fj)];
+            mu_pos = [mu(n+fi) mu(n+fj)];
+            S_pos = [S(n+fi,n+fi) S(n+fi,n+fj); S(n+fj,5+fi) S(n+fj,n+fj)];
             error_ellipse(S_pos,mu_pos,0.95);
         end
     end
@@ -275,7 +275,7 @@ end
 %%
 
 
-function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n, mu)
+function [x_plus, next_point, a,v ] = motModel(x, start_point, end_point, v,dt,n, mu, vcont)
     % The desired trajectory is a line segment consisting of 2 points from
     % the desired trajectory
     delta_max = 25*pi/180; % max steering angle
@@ -283,7 +283,10 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n, m
     kp = 1;
     ki = 0.01;
     robot_length = 1; % Car length
-
+    
+    if vcont
+      v = v + kp*(5-v);
+    end
 %     CALCULATE ALL COMMANDS BASED ON mu.
 %     v = mu(4);
 %     v = 5;
