@@ -1,0 +1,255 @@
+clc; clear; close all;
+run('warehouse.m');
+
+newfeature_known = ones(4,1);
+newfeature_unknown = ones(200,1);
+mufeat_known = known_fiducials;
+S0feat_known = zeros(4);
+
+
+
+
+% Fixed vehicle parameters
+v = 5;
+
+% Desired trajectory as a plot of points. The plot of points defines
+% multiple line segments all joined together. The vehicle will first follow
+% along the first line segment. After it is has driven past the length of
+% said line segment, it defines a new line segment to follow by taking the
+% next point.
+
+traj_points = path;
+traj_point_counter = 1; % Keep track of where we are in the trajectory
+           
+% Initial conditions in [x y heading]
+x0_r = [x0; 0]; 
+
+% Simulation time
+Tmax = 80;  % End point
+dt =0.1; % Time step
+T = 0:dt:Tmax; % Time vector
+
+nO = 4;
+nE = 4;
+obsEdges = [];
+for i=9:(length(warehouse_map) -1)
+    if (any(isnan(warehouse_map(i, :))) || any(isnan(warehouse_map(i+1, :))))
+      continue
+    end
+    obsEdges = [obsEdges; warehouse_map(i, :) warehouse_map(i+1, :)];
+end
+%%
+% Simulation setup
+xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
+x = zeros(length(T),3);  % State ([e psi] 
+x(1,:) = x0_r; % Initial condition
+delta = zeros(length(T),1); % Steering angles
+
+% figure(1);clf; hold on;
+hold on;
+% axis([-10 10 -10 10]);
+for t=1:length(T)-1
+    end_point = traj_points(traj_point_counter+1, :);
+    start_point = traj_points(traj_point_counter, :);
+    
+    [x(t+1,:), next_point] = motModel(x(t,:), start_point, end_point, v, dt);
+ 
+    
+    [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
+    %
+    testY = y_unknown + x(t+1, 1:2);
+    for i=1:length(flistunknown)
+      if (flistunknown(i))
+        plot(testY(i,1), testY(i,2), 'm*')
+      end
+    end
+    
+    % Check if we have travelled the distance of the line segment. 
+    % If we have, then get the next point
+    if (next_point == 1)
+        traj_point_counter = traj_point_counter+1;
+        if (traj_point_counter == length(traj_points(:,1)))
+            break;
+        end
+    end
+    
+    plot(x(1:t,1),x(1:t,2),'bo');
+
+  drawnow
+end
+
+%% Plotting
+
+% Plotting the trajectory of the vehicle
+figure(1);clf; hold on;
+plot(x(1:t,1),x(1:t,2),'b-');
+
+for t=1:30:t
+      drawbox(x(t,1),x(t,2),x(t,3),.5,1);
+end
+xlabel('x (m)')
+ylabel('y (m)')
+axis equal
+
+
+% Phase portrait
+% [crosstrack,heading] = meshgrid(-10:.5:10,-3:.2:3); % Create a grid over values of the crosstrack error and heading error
+% delta = max(-delta_max,min(delta_max,heading+atan2(k*crosstrack,velocity)));  % Calculate steering angle at each point
+% ed = velocity*sin(heading-delta); % Find crosstrack derivative
+% psid = -(velocity*sin(delta))/(robot_length); % Find heading derivative
+
+% psibplus = -atan2(k*crosstrack(1,:),velocity)+delta_max; % Find border of max region
+% psibminus = -atan2(k*crosstrack(1,:),velocity)-delta_max; % Find border of min region
+% 
+% figure(2);clf; hold on;
+% quiver(crosstrack,heading, ed, psid)
+% plot(crosstrack(1,:),psibplus,'r', 'LineWidth',2);
+% plot(crosstrack(1,:),psibminus,'r', 'LineWidth',2);
+% axis([-10 10 -3 3])
+% xlabel('e (m)')
+% ylabel('\psi (rad)')
+
+
+%%
+
+% Collision test
+obsEdges(2,1:2)
+[col, edge] = checkCollision(x0.', x0+ 1, obsEdges)
+%%
+
+% Measurement test.
+[y_known, y_unknown, flistknown, flistunknown] = measModel([x0; pi/2], known_fiducials, unknown_fiducials, obsEdges)
+%
+hold on
+testY = y_unknown + x0.'
+for i=1:length(flistunknown)
+  if (flistunknown(i))
+    plot(testY(i,1), testY(i,2), 'b*')
+  end
+end
+%%
+
+
+function [x_plus, next_point] = motModel(x, start_point, end_point, v,dt)
+    % The desired trajectory is a line segment consisting of 2 points from
+    % the desired trajectory
+    delta_max = 25*pi/180; % max steering angle
+    k = 2.5; % Gain
+    robot_length = 1; % Car length
+
+    traj_angle = atan2(end_point(2) - start_point(2), end_point(1) - start_point(1));
+    
+    [crosstrack_error, next_point] = distanceToLineSegment(start_point,end_point,x(1:2));
+    
+    % Calculate steering angle
+    delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - x(3))+ atan2(-k*crosstrack_error,v)));
+    % State derivatives
+    xd(1) = v*cos(x(3));
+    xd(2) = v*sin(x(3));
+    xd(3) = v*tan(delta/robot_length);
+    
+    % State update
+    x_plus(1) = x(1)+dt*xd(1);
+    x_plus(2) = x(2)+dt*xd(2);
+    x_plus(3) = x(3)+dt*xd(3);
+    
+    % angle wrap the heading + noise.
+    x_plus(1) = x_plus(1) + 0.02 * randn();
+    x_plus(2) = x_plus(2) + 0.02 * randn();
+    x_plus(3) = x_plus(3) + 0.002 * randn();
+    x_plus(3) = angleWrap(x_plus(3));
+end
+
+function [ inCollision, edge ] = checkCollision( ptA, ptB, obstEdges )
+  %CHECKCOLLISION Checks if a line interesects with a set of edges
+  %   Detailed explanation goes here
+
+  % Check for each edge
+  edge = [];
+  for k = 1:size(obstEdges,1)
+      % If both vertices aren't to the left, right, above, or below the
+      % edge's vertices in question, then test for collision
+      if ~((max([ptA(1),ptB(1)])<min([obstEdges(k,1),obstEdges(k,3)])) || ...
+           (min([ptA(1),ptB(1)])>max([obstEdges(k,1),obstEdges(k,3)])) || ...
+           (max([ptA(2),ptB(2)])<min([obstEdges(k,2),obstEdges(k,4)])) || ...
+           (min([ptA(2),ptB(2)])>max([obstEdges(k,2),obstEdges(k,4)])))
+          if (EdgeCollision([ptA, ptB], obstEdges(k,:)))
+              % Eliminate end-to-end contacts from collisions list
+              if (sum(abs(ptA-obstEdges(k,1:2)))>0 && ...
+                  sum(abs(ptB-obstEdges(k,1:2)))>0 && ...
+                  sum(abs(ptA-obstEdges(k,3:4)))>0 && ...
+                  sum(abs(ptB-obstEdges(k,3:4)))>0)
+
+                  edge = k;
+                  inCollision = 1 ; % In Collision
+                  return
+              end
+          end
+      end
+  end
+  inCollision = 0 ; % Not in collision
+end
+
+
+function [y_known, y_unknown, flist_known , flist_unknown] = measModel(x, markers_known, markers_unknown, edges)
+  szKnown = length(markers_known);
+  szunKnown = length(markers_unknown);
+  flist_known = zeros(szKnown,1);
+  flist_unknown = zeros(szunKnown,1);
+  y_known = zeros(szKnown,2);
+  y_unknown = zeros(szunKnown,2);
+  diff = markers_known - x(1:2).';
+  R = rot2D(x(3));
+  S = eye(2) * 0.1;
+  [QiE, Qie] = eig(S);
+
+  for i = 1:szKnown
+    [collide, edge] = checkCollision(x(1:2).', markers_known(i,:), edges);
+    if (collide)
+      continue;
+    end
+    rotated =  R * diff(i,:).';
+    if (abs(rotated(1)) > 10 || abs(rotated(2)) > 7.5)
+      continue;
+    end
+    flist_known(i) = 1;
+    d = QiE*sqrt(Qie)*randn(2,1);
+    y_known(i, :) = diff(i,:) + d.';
+    
+  end
+  diff = markers_unknown - x(1:2).';
+  for i = 1:szunKnown
+    [collide, edge] = checkCollision(x(1:2).', markers_unknown(i,:), edges);
+    if (collide)
+      continue;
+    end
+    rotated = R * diff(i,:).';
+    if (abs(rotated(1)) > 10 || abs(rotated(2)) > 7.5)
+      continue;
+    end
+    flist_unknown(i) = 1;
+    d = QiE*sqrt(Qie)*randn(2,1);
+    y_unknown(i,:) = diff(i,:) + d.';
+  end
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
