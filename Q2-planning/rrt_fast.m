@@ -83,7 +83,7 @@ while ((~done) && (t < max_iters))
         
         %randomly connect to closest nodes. 
         if rand() > 0.8
-          e = makeConnections(milestones, e, uint32(rand() * (nCon - 1)) + 1, obsEdges, nClosest);
+          e = makeConnections(milestones, e, nCon, obsEdges, nClosest);
         end
         
     end
@@ -206,13 +206,13 @@ function [e] = makeConnections(milestones, e, nCon, obsEdges, nClosest)
       end
       for j=1:nMadeCon
           cur = ind(j);
-          if (i<cur)
+%           if (i<cur)
               if (~CheckCollision(milestones(i,:),milestones(cur,:), obsEdges))
                   e(i,cur) = 1;
                   e(cur,i) = 1;
                   plot([milestones(i,1) milestones(cur,1)],[milestones(i,2) milestones(cur,2)],'m');
               end
-          end
+%           end
       end
 %   end
 end
