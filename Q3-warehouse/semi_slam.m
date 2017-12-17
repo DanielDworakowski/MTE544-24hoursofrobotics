@@ -15,8 +15,9 @@ S0feat_unknown = 100*eye(2*200);
 
 % 
 % Motion disturbance.
-R = 0.02*ones(5,5);
-R(5,5) = 0.002;
+n = 4;
+R = 0.02*ones(n,n);
+% R(5,5) = 0.002;
 R(4,4) = 0.002;
 Qi = eye(2) * 0.1;
 
@@ -52,17 +53,17 @@ end
 %%
 % Simulation setup
 % xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
-x = zeros(length(T),5);  % State ([e psi] 
-x(1,:) = [x0_r; 5; 0]; % Initial condition
-s_rr = eye(5) * 4;
+x = zeros(length(T),n);  % State ([e psi] 
+x(1,:) = [x0_r; 5]; % Initial condition
+s_rr = eye(n) * 4;
 s_rr(4,4) = 0;
-s_rr(5,5) = 0;
+% s_rr(5,5) = 0;
 y = zeros(408,1);
 
 % Construct overall mean and variances. 
 mu = [x(1,:).'; mufeat_known; mufeat_unknown];
-S = [s_rr zeros(5,2*4); zeros(2*4,5) S0feat_known];
-S = [S zeros(5+8, 400); zeros(400, 5+8) S0feat_unknown];
+S = [s_rr zeros(n,2*4); zeros(2*4,n) S0feat_known];
+S = [S zeros(n+8, 400); zeros(400, n+8) S0feat_unknown];
 %%
 % figure(1);clf; hold on;
 hold on;
@@ -71,7 +72,7 @@ for t=1:length(T)-1
     end_point = traj_points(traj_point_counter+1, :);
     start_point = traj_points(traj_point_counter, :);
     
-    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt);
+    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt,n);
  
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
@@ -93,8 +94,8 @@ for t=1:length(T)-1
 %%
 % motion cov update.
 % mu(1:5) = x(t+1,:).';
-[mu(1:5), next_point, a] = motModel(mu(1:5).', start_point, end_point, v, dt);
-S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
+[mu(1:n), next_point, a] = motModel(mu(1:n).', start_point, end_point, v, dt,n);
+S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
 % Measurement update. 
     for i=1:204
         if (flist(i))
@@ -108,8 +109,8 @@ S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
                 dy = y(2*i);
                 Rot = rot2D(-mu(3));
                 newy = Rot * [dx dy].';
-                mu(5+2*(i-1)+1) = mu(1)+newy(1);
-                mu(5+2*i) = mu(2)+newy(2);
+                mu(n+2*(i-1)+1) = mu(1)+newy(1);
+                mu(n+2*i) = mu(2)+newy(2);
                 newfeature(i) = 0;
             end
             % Linearization
@@ -131,20 +132,20 @@ S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
             
 %             plot(mu(5+2*(i-1)+1), mu(5+2*i), 'gx')
        
-            mu(1:5) - x(t+1,:).'
-            dx = mu(5+2*(i-1)+1) - mu(1);
-            dy = mu(5+2*i) - mu(2);
-            Fi = zeros(5,5+408);
-            Fi(1:5,1:5) = eye(5);
-            Fi(6:7,5+2*(i-1)+1:5+2*i) = eye(2);
+            mu(1:n) - x(t+1,:).'
+            dx = mu(n+2*(i-1)+1) - mu(1);
+            dy = mu(n+2*i) - mu(2);
+            Fi = zeros(n,n+408);
+            Fi(1:n,1:n) = eye(n);
+            Fi(n+1:n+2,n+2*(i-1)+1:n+2*i) = eye(2);
             th = mu(3);
             rot = rot2D(th);
-            xf = mu(5+2*(i-1)+1);
+            xf = mu(n+2*(i-1)+1);
             xr = mu(1);
-            yf = mu(5+2*i);
+            yf = mu(n+2*i);
             yr = mu(2);
-            Ht = [-cos(th), sin(th), (-xf*sin(th)+xr*sin(th)-yf*cos(th)+yr*cos(th)), 0, 0,  cos(th), -sin(th),;
-                  -sin(th), -cos(th), (xf*cos(th)-xr*cos(th)-yf*sin(th)+yr*sin(th)), 0, 0,  sin(th), cos(th)]*Fi;
+            Ht = [-cos(th), sin(th), (-xf*sin(th)+xr*sin(th)-yf*cos(th)+yr*cos(th)), 0,   cos(th), -sin(th),;
+                  -sin(th), -cos(th), (xf*cos(th)-xr*cos(th)-yf*sin(th)+yr*sin(th)), 0,   sin(th), cos(th)]*Fi;
 %             Ht
             I = y(2*(i-1)+1:2*i)-rot*[dx dy].';
 %             I
@@ -163,7 +164,7 @@ S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
 %             mu(5+2*i)
             mu(3) = angleWrap(mu(3));
 %             mu(3)
-            S = (eye(5+408)-K*Ht)*S;
+            S = (eye(n+408)-K*Ht)*S;
                         % In cases if S bemoes not positive definite, manually make it
             % P.D.
             if min(eig(S))<0
@@ -272,7 +273,7 @@ end
 %%
 
 
-function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
+function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n)
     % The desired trajectory is a line segment consisting of 2 points from
     % the desired trajectory
     delta_max = 25*pi/180; % max steering angle
@@ -289,8 +290,6 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     
     % Calculate steering angle
     delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - x(3))+ atan2(-k*crosstrack_error,v)));
-    display('delta')
-    delta
     % State derivatives
 %     xd(1) = v*cos(x(3));
 %     xd(2) = v*sin(x(3));
@@ -303,26 +302,26 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
 %     x_plus(4) = x(4);
 %     x_plus(5) = x(4);
 
-    a = eye(5);
+    a = eye(n);
     a(1,3) = -dt * x(4) * sin(x(3));
     a(1,4) = dt * cos(x(3));
     a(2,3) = dt * x(4) * cos(x(3));
     a(2,4) = dt * sin(x(3));
     a(3,4) = dt * tan(delta/robot_length);
     a(4,4) = 1;
-    a(5,5) = 1;
+%     a(5,5) = 1;
 %     a(5,4) = 1;
-    a(5,5) = 1;
+%     a(5,5) = 1;
     x_plus = a * x.';
-    x_plus(4) = 5 + kp*(5-x(4)) + ki * x(5);
-    x_plus(5) = x_plus(5) + ki * (5 - x(4));
+    x_plus(4) = 5 + kp*(5-x(4)); % + ki * x(5);
+%     x_plus(5) = x_plus(5) + ki * (5 - x(4));
 
     % angle wrap the heading + noise.
     x_plus(1) = x_plus(1) + 0.02 * randn();
     x_plus(2) = x_plus(2) + 0.02 * randn();
     x_plus(3) = x_plus(3) + 0.002 * randn();
     x_plus(4) = x_plus(4) + 0.002 * randn();
-    x_plus(5) = x_plus(5) + 0.002 * randn();
+%     x_plus(5) = x_plus(5) + 0.002 * randn();
     x_plus(3) = angleWrap(x_plus(3));
 end
 

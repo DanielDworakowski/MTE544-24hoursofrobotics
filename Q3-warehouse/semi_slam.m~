@@ -131,6 +131,7 @@ S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
             
 %             plot(mu(5+2*(i-1)+1), mu(5+2*i), 'gx')
        
+            mu(1:5) - x(t+1,:).'
             dx = mu(5+2*(i-1)+1) - mu(1);
             dy = mu(5+2*i) - mu(2);
             Fi = zeros(5,5+408);
@@ -160,8 +161,8 @@ S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
 %             display('after');
 %             mu(5+2*(i-1)+1)
 %             mu(5+2*i)
-%             mu(3) = angleWrap(mu(3));
-            mu(3)
+            mu(3) = angleWrap(mu(3));
+%             mu(3)
             S = (eye(5+408)-K*Ht)*S;
                         % In cases if S bemoes not positive definite, manually make it
             % P.D.
@@ -288,8 +289,6 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     
     % Calculate steering angle
     delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - x(3))+ atan2(-k*crosstrack_error,v)));
-    display('delta')
-    delta
     % State derivatives
 %     xd(1) = v*cos(x(3));
 %     xd(2) = v*sin(x(3));
@@ -309,7 +308,7 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     a(2,4) = dt * sin(x(3));
     a(3,4) = dt * tan(delta/robot_length);
     a(4,4) = 1;
-    a(4,5) = 1;
+    a(5,5) = 1;
 %     a(5,4) = 1;
     a(5,5) = 1;
     x_plus = a * x.';
@@ -320,7 +319,9 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     x_plus(1) = x_plus(1) + 0.02 * randn();
     x_plus(2) = x_plus(2) + 0.02 * randn();
     x_plus(3) = x_plus(3) + 0.002 * randn();
-%     x_plus(3) = angleWrap(x_plus(3));
+    x_plus(4) = x_plus(4) + 0.002 * randn();
+    x_plus(5) = x_plus(5) + 0.002 * randn();
+    x_plus(3) = angleWrap(x_plus(3));
 end
 
 function [ inCollision, edge ] = checkCollision( ptA, ptB, obstEdges )
