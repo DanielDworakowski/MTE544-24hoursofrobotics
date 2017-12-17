@@ -27,7 +27,7 @@ figure(1); hold on;
 disp('Time to create environment');
 
 goalIdx = -1;
-nClosest = 20;
+nClosest = 10;
 
 %% RRT, created until solution found
 tic;
@@ -191,7 +191,8 @@ end
 
 function [e] = makeConnections(milestones, e, nCon, obsEdges, nClosest)
   nM = length(milestones(:,1));
-  for i = 1:nCon
+  i = nCon;
+%   for i = 1:nCon
       % Find closest neighbours
       for j = 1:nM
           d(j) = norm(milestones(i,:)-milestones(j,:));
@@ -213,5 +214,5 @@ function [e] = makeConnections(milestones, e, nCon, obsEdges, nClosest)
               end
           end
       end
-  end
+%   end
 end
