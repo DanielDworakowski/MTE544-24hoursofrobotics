@@ -11,7 +11,7 @@ for i=1:4
 end
 
 mufeat_unknown = zeros(2*200,1);
-S0feat_unknown = 0.1*eye(2*200);
+S0feat_unknown = 100*eye(2*200);
 
 
 % Fixed vehicle parameters
@@ -49,13 +49,14 @@ end
 x = zeros(length(T),5);  % State ([e psi] 
 x(1,:) = [x0_r; 5; 0]; % Initial condition
 s_rr = eye(5) * 4;
-s_rr(4) = 0;
-s_rr(5) = 0;
-
+s_rr(4,4) = 0;
+s_rr(5,5) = 0;
+y = zeros(408,1);
 
 % Construct overall mean and variances. 
 mu = [x(1,:).'; mufeat_known; mufeat_unknown];
-S = [s_rr zeros(4,4)
+S = [s_rr zeros(5,2*4); zeros(2*4,5) S0feat_known];
+S = [S zeros(5+8, 400); zeros(400, 5+8) S0feat_unknown];
 %%
 % figure(1);clf; hold on;
 hold on;
@@ -69,12 +70,22 @@ for t=1:length(T)-1
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
     %
-%     testY = y_unknown + x(t+1, 1:2);
-%     for i=1:length(flistunknown)
-%       if (flistunknown(i))
-%         plot(testY(i,1), testY(i,2), 'm*')
-%       end
-%     end
+    % Fill in measurements. 
+    for i=1:length(flistknown)
+      if (flistknown(i))
+        y(2*(i-1)+1:2*i) = y_known(i,:).'; 
+      end
+    end
+    for i=1:length(flistunknown)
+      idx = i + 4;
+      if (flistunknown(i))
+        y_unknown(i,:)
+        y(2*(idx-1)+1:2*idx) = y_unknown(i,:).';
+
+      end
+    end
+%     y
+
     
     % Check if we have travelled the distance of the line segment. 
     % If we have, then get the next point

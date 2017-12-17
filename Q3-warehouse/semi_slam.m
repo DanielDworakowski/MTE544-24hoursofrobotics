@@ -51,7 +51,7 @@ x(1,:) = [x0_r; 5; 0]; % Initial condition
 s_rr = eye(5) * 4;
 s_rr(4,4) = 0;
 s_rr(5,5) = 0;
-
+y = zeros(408,1);
 
 % Construct overall mean and variances. 
 mu = [x(1,:).'; mufeat_known; mufeat_unknown];
@@ -70,12 +70,20 @@ for t=1:length(T)-1
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
     %
-%     testY = y_unknown + x(t+1, 1:2);
-%     for i=1:length(flistunknown)
-%       if (flistunknown(i))
-%         plot(testY(i,1), testY(i,2), 'm*')
-%       end
-%     end
+    % Fill in measurements. 
+    for i=1:length(flistknown)
+      if (flistknown(i))
+        y(2*(i-1)+1:2*i) = y_known(i,:).'; 
+      end
+    end
+    for i=1:length(flistunknown)
+      idx = i + 4;
+      if (flistunknown(i))
+        y(2*(idx-1)+1:2*idx) = y_unknown(i,:).';
+
+      end
+    end
+
     
     % Check if we have travelled the distance of the line segment. 
     % If we have, then get the next point
