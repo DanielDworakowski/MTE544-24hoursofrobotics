@@ -27,7 +27,7 @@ figure(1); hold on;
 disp('Time to create environment');
 
 goalIdx = -1;
-nClosest = 10;
+nClosest = 30;
 
 %% RRT, created until solution found
 tic;
@@ -35,7 +35,7 @@ done = 0;
 milestones = [x0];
 nM = 1;
 t= 0;
-max_iters = 1000;
+max_iters = 10000;
 collision_step_size = 0.1;
 e = zeros(max_iters,max_iters);
 nCon = 1;
@@ -83,7 +83,7 @@ while ((~done) && (t < max_iters))
         
         %randomly connect to closest nodes. 
         if rand() > 0.8
-          e = makeConnections(milestones, e, nCon, obsEdges, nClosest);
+          e = makeConnections(milestones, e, uint32(rand() * (nCon - 1)) + 1, obsEdges, nClosest);
         end
         
     end
