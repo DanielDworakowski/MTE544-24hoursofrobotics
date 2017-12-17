@@ -72,7 +72,7 @@ for t=1:length(T)-1
     end_point = traj_points(traj_point_counter+1, :);
     start_point = traj_points(traj_point_counter, :);
     
-    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt,n);
+    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt,n, mu(1:n));
  
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
@@ -94,7 +94,7 @@ for t=1:length(T)-1
 %%
 % motion cov update.
 % mu(1:5) = x(t+1,:).';
-[mu(1:n), next_point, a] = motModel(mu(1:n).', start_point, end_point, v, dt,n);
+[mu(1:n), next_point, a] = motModel(mu(1:n).', start_point, end_point, v, dt,n, mu);
 S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
 % Measurement update. 
     for i=1:204
@@ -273,7 +273,7 @@ end
 %%
 
 
-function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n)
+function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n, mu)
     % The desired trajectory is a line segment consisting of 2 points from
     % the desired trajectory
     delta_max = 25*pi/180; % max steering angle
@@ -282,14 +282,15 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n)
     ki = 0.01;
     robot_length = 1; % Car length
 
-    v = x(4);
+%     CALCULATE ALL COMMANDS BASED ON mu.
+    v = mu(4);
     
     traj_angle = atan2(end_point(2) - start_point(2), end_point(1) - start_point(1));
     
-    [crosstrack_error, next_point] = distanceToLineSegment(start_point,end_point,x(1:2));
+    [crosstrack_error, next_point] = distanceToLineSegment(start_point,end_point,mu(1:2).');
     
     % Calculate steering angle
-    delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - x(3))+ atan2(-k*crosstrack_error,v)));
+    delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - mu(3))+ atan2(-k*crosstrack_error,v)));
     % State derivatives
 %     xd(1) = v*cos(x(3));
 %     xd(2) = v*sin(x(3));
