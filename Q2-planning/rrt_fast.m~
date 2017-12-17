@@ -25,7 +25,6 @@ plotEnvironment(obsPtsStore,xMin, xMax, x0, xF, fig);
 drawnow();
 figure(1); hold on;
 disp('Time to create environment');
-toc;
 
 goalIdx = -1;
 
@@ -35,7 +34,7 @@ done = 0;
 milestones = [x0];
 nM = 1;
 t= 0;
-max_iters = 150;
+max_iters = 1000;
 collision_step_size = 0.1;
 e = zeros(max_iters,max_iters);
 nCon = 1;
@@ -80,6 +79,12 @@ while ((~done) && (t < max_iters))
         nM = nM+1;
         plot(samples(:,1),samples(:,2),'m');
         plot(milestones(end,1),milestones(end,2),'mo');
+        
+        %randomly connect to closest nodes. 
+        if rand() > 0.8
+          e = makeConnections(milestones, e, nCon, obsEdges);
+        end
+        
     end
     
     % Check if a path from start to end is found
@@ -90,28 +95,42 @@ while ((~done) && (t < max_iters))
         samples(i,:) = ((steps-i)/steps)*milestones(end,1:2) + (i/steps)*xF;
     end
     keep = inpolygon(samples(:,1), samples(:,2), env(:,1),env(:,2));
+    
 
     if (sum(keep)==steps)
         milestones = [milestones; samples(end,:)];
-        if goal
-        nCon = nCon + 1;
-        goalIdx = nCon;
-        e(nCon - 1, nCon) = 1;
-        e(nCon,nCon - 1) = 1;
+                  nCon = nCon + 1;
+        if goalIdx == -1
+          goalIdx = nCon
+        end
+        e(nCon - 1, goalIdx) = 1;
+        e(goalIdx,nCon - 1) = 1;
         nM = nM+1;
         plot(samples(:,1),samples(:,2),'m');
         plot(milestones(end,1),milestones(end,2),'mo');
 %         done = 1;
     end
+    if mod(t, 50) == 0
+      if goalIdx == -1
+        continue
+      end
+      [sp, sd] = shortestpath_new(milestones, e, 1, goalIdx);
+      t
+      sd
+      if ((sd - 61.55) / 61.55) < 0.05
+        done = 1;
+      end
+    end
 end
-
+toc;
 % % Find and plot final path through back tracing
 % if (done)
-  [sp, sd] = shortestpath_new(milestones, e, 1, nCon);
+  [sp, sd] = shortestpath_new(milestones, e, 1, goalIdx);
   sd
   for i=1:length(sp)-1
       plot(milestones(sp(i:i+1),1),milestones(sp(i:i+1),2), 'go-', 'LineWidth',3);
   end
+  
 %     done = 0;
 %     cur = nM
 %     curC = milestones(nM,:);
@@ -137,3 +156,57 @@ end
 % else
 %     disp('No path found');
 % end
+
+
+function [ inCollision, edge ] = CheckCollision( ptA, ptB, obstEdges )
+  %CHECKCOLLISION Checks if a line interesects with a set of edges
+  %   Detailed explanation goes here
+
+  % Check for each edge
+  edge = [];
+  for k = 1:size(obstEdges,1)
+      % If both vertices aren't to the left, right, above, or below the
+      % edge's vertices in question, then test for collision
+      if ~((max([ptA(1),ptB(1)])<min([obstEdges(k,1),obstEdges(k,3)])) || ...
+           (min([ptA(1),ptB(1)])>max([obstEdges(k,1),obstEdges(k,3)])) || ...
+           (max([ptA(2),ptB(2)])<min([obstEdges(k,2),obstEdges(k,4)])) || ...
+           (min([ptA(2),ptB(2)])>max([obstEdges(k,2),obstEdges(k,4)])))
+          if (EdgeCollision([ptA, ptB], obstEdges(k,:)))
+              % Eliminate end-to-end contacts from collisions list
+              if (sum(abs(ptA-obstEdges(k,1:2)))>0 && ...
+                  sum(abs(ptB-obstEdges(k,1:2)))>0 && ...
+                  sum(abs(ptA-obstEdges(k,3:4)))>0 && ...
+                  sum(abs(ptB-obstEdges(k,3:4)))>0)
+
+                  edge = k;
+                  inCollision = 1 ; % In Collision
+                  return
+              end
+          end
+      end
+  end
+  inCollision = 0 ; % Not in collision
+end
+
+function [e] = makeConnections(milestones, e, nCon, obsEdges, nClose)
+  nM = length(milestones(:,1));
+  for i = 1:nCon
+      % Find closest neighbours
+      for j = 1:nM
+          d(j) = norm(milestones(i,:)-milestones(j,:));
+      end
+      [d2,ind] = sort(d);
+      % Check for edge collisions (no need to check if entire edge is
+      % contained in obstacles as both endpoints are in free space)
+      for j=1:p
+          cur = ind(j);
+          if (i<cur)
+              if (~CheckCollision(milestones(i,:),milestones(cur,:), obsEdges))
+                  e(i,cur) = 1;
+                  e(cur,i) = 1;
+                  plot([milestones(i,1) milestones(cur,1)],[milestones(i,2) milestones(cur,2)],'m');
+              end
+          end
+      end
+  end
+end
