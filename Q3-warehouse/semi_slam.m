@@ -15,10 +15,10 @@ S0feat_unknown = 100*eye(2*200);
 
 % 
 % Motion disturbance.
-n = 4;
+n = 3;
 R = 0.02*ones(n,n);
 % R(5,5) = 0.002;
-R(4,4) = 0.002;
+% R(4,4) = 0.002;
 Qi = eye(2) * 0.1;
 
 % Fixed vehicle parameters
@@ -54,9 +54,9 @@ end
 % Simulation setup
 % xd = zeros(length(T)-1,3); % Derivative of state ([edot psidot])
 x = zeros(length(T),n);  % State ([e psi] 
-x(1,:) = [x0_r; 5]; % Initial condition
+x(1,:) = [x0_r]; % Initial condition
 s_rr = eye(n) * 4;
-s_rr(4,4) = 0;
+% s_rr(4,4) = 0;
 % s_rr(5,5) = 0;
 y = zeros(408,1);
 
@@ -72,8 +72,10 @@ for t=1:length(T)-1
     end_point = traj_points(traj_point_counter+1, :);
     start_point = traj_points(traj_point_counter, :);
     
-    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt,n, mu(1:n));
- 
+    v
+    [x(t+1,:), next_point, a] = motModel(x(t,:), start_point, end_point, v, dt, n, mu(1:n));
+    display('asssad'); 
+    x(t+1,:);
     
     [y_known, y_unknown, flistknown, flistunknown] = measModel(x(t+1,:).', known_fiducials, unknown_fiducials, obsEdges);
     flist = [flistknown; flistunknown];
@@ -132,7 +134,7 @@ S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
             
 %             plot(mu(5+2*(i-1)+1), mu(5+2*i), 'gx')
        
-            mu(1:n) - x(t+1,:).'
+            mu(1:n) - x(t+1,:).';
             dx = mu(n+2*(i-1)+1) - mu(1);
             dy = mu(n+2*i) - mu(2);
             Fi = zeros(n,n+408);
@@ -144,13 +146,13 @@ S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
             xr = mu(1);
             yf = mu(n+2*i);
             yr = mu(2);
-            Ht = [-cos(th), sin(th), (-xf*sin(th)+xr*sin(th)-yf*cos(th)+yr*cos(th)), 0,   cos(th), -sin(th),;
-                  -sin(th), -cos(th), (xf*cos(th)-xr*cos(th)-yf*sin(th)+yr*sin(th)), 0,   sin(th), cos(th)]*Fi;
+            Ht = [-cos(th), sin(th), (-xf*sin(th)+xr*sin(th)-yf*cos(th)+yr*cos(th)),    cos(th), -sin(th),;
+                  -sin(th), -cos(th), (xf*cos(th)-xr*cos(th)-yf*sin(th)+yr*sin(th)),    sin(th), cos(th)]*Fi;
 %             Ht
             I = y(2*(i-1)+1:2*i)-rot*[dx dy].';
 %             I
 %             mu(3)
-            x(t+1,3)
+            x(t+1,3);
             % Measurement update
             K = S*Ht'/(Ht*S*Ht'+Qi);
 %             display('before')
@@ -184,21 +186,21 @@ S(1:n,1:n) = a * S(1:n, 1:n) * a' + R;
     %plot([mu_S(1,t) mu_S(1,t)+1*cos(yaw)],[mu_S(3,t) mu_S(3,t)+1*sin(yaw)], 'b-')
     mu_pos = [mu(1) mu(2)];
     S_pos = [S(1,1) S(1,2); S(2,1) S(2,2)];
-%     error_ellipse(S_pos,mu_pos,0.75);
-%     error_ellipse(S_pos,mu_pos,0.95);
+    error_ellipse(S_pos,mu_pos,0.75);
+    error_ellipse(S_pos,mu_pos,0.95);
 %     plot( [mu(1) mu(1)+2*cos(phides)],[mu(3) mu(3)+2*sin(phides)], 'b')
-%     for i=1:204
-%         if (flist(i))
-%             fi = 2*(i-1)+1;
-%             fj = 2*i;
-% %             testY = y_unknown + x0.'
-% %             plot([mu(1) mu(1)+rxy*cos(y(fj,t)+yaw)], [mu(3) mu(3)+rxy*sin(y(fj,t)+yaw)], 'c');
-%             plot(mu(5+fi),mu(5+fj), 'gx')
-%             mu_pos = [mu(5+fi) mu(5+fj)];
-%             S_pos = [S(5+fi,5+fi) S(5+fi,5+fj); S(5+fj,5+fi) S(5+fj,5+fj)];
-%             error_ellipse(S_pos,mu_pos,0.95);
-%         end
-%     end
+    for i=1:204
+        if (flist(i))
+            fi = 2*(i-1)+1;
+            fj = 2*i;
+%             testY = y_unknown + x0.'
+%             plot([mu(1) mu(1)+rxy*cos(y(fj,t)+yaw)], [mu(3) mu(3)+rxy*sin(y(fj,t)+yaw)], 'c');
+            plot(mu(5+fi),mu(5+fj), 'gx')
+            mu_pos = [mu(5+fi) mu(5+fj)];
+            S_pos = [S(5+fi,5+fi) S(5+fi,5+fj); S(5+fj,5+fi) S(5+fj,5+fj)];
+            error_ellipse(S_pos,mu_pos,0.95);
+        end
+    end
 %     axis equal
 %     axis([-4 6 -1 7])
     title('SLAM with Range & Bearing Measurements')
@@ -255,18 +257,18 @@ axis equal
 
 % Collision test
 obsEdges(2,1:2)
-[col, edge] = checkCollision(x0.', x0+ 1, obsEdges)
+[col, edge] = checkCollision(x0.', x0+ 1, obsEdges);
 %%
 
 % Measurement test.
-[y_known, y_unknown, flistknown, flistunknown] = measModel([x0; pi/2], known_fiducials, unknown_fiducials, obsEdges)
+[y_known, y_unknown, flistknown, flistunknown] = measModel([x0; pi/2], known_fiducials, unknown_fiducials, obsEdges);
 %
 hold on
 R= rot2D(-pi/2);
 testY = y_unknown;
 for i=1:length(flistunknown)
   if (flistunknown(i))
-    testing = R*testY(i,:).' + x0
+    testing = R*testY(i,:).' + x0;
     plot(testing(1), testing(2), 'b*')
   end
 end
@@ -283,8 +285,8 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n, m
     robot_length = 1; % Car length
 
 %     CALCULATE ALL COMMANDS BASED ON mu.
-    v = mu(4);
-    
+%     v = mu(4);
+%     v = 5;
     traj_angle = atan2(end_point(2) - start_point(2), end_point(1) - start_point(1));
     
     [crosstrack_error, next_point] = distanceToLineSegment(start_point,end_point,mu(1:2).');
@@ -302,26 +304,32 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt,n, m
 %     x_plus(3) = x(3)+dt*xd(3);
 %     x_plus(4) = x(4);
 %     x_plus(5) = x(4);
-
+%   v
     a = eye(n);
-    a(1,3) = -dt * x(4) * sin(x(3));
-    a(1,4) = dt * cos(x(3));
-    a(2,3) = dt * x(4) * cos(x(3));
-    a(2,4) = dt * sin(x(3));
-    a(3,4) = dt * tan(delta/robot_length);
-    a(4,4) = 1;
+%     a(1,1) = 1
+    a(1,3) = -dt * v * sin(x(3));
+%     a(1,4) = dt * cos(x(3));
+    a(2,3) = dt * v * cos(x(3));
+%     a(2,4) = dt * sin(x(3));
+% %     a(3,4) = dt * tan(delta/robot_length);
+%     a(4,4) = 1;
 %     a(5,5) = 1;
 %     a(5,4) = 1;
 %     a(5,5) = 1;
     x_plus = a * x.';
-    x_plus(4) = 5 + kp*(5-x(4)); % + ki * x(5);
+    x_plus(1) = x_plus(1) + v * dt * cos(x(3));
+    x_plus(2) = x_plus(2) + v * dt * sin(x(3));
+    x_plus(3) = x_plus(3) + dt * tan(delta/robot_length);
+%     x_plus(4) = 5 + kp*(5-x(4)); % + ki * x(5);
 %     x_plus(5) = x_plus(5) + ki * (5 - x(4));
+
+%     v
 
     % angle wrap the heading + noise.
     x_plus(1) = x_plus(1) + 0.02 * randn();
     x_plus(2) = x_plus(2) + 0.02 * randn();
     x_plus(3) = x_plus(3) + 0.002 * randn();
-    x_plus(4) = x_plus(4) + 0.002 * randn();
+%     x_plus(4) = x_plus(4) + 0.002 * randn();
 %     x_plus(5) = x_plus(5) + 0.002 * randn();
     x_plus(3) = angleWrap(x_plus(3));
 end
@@ -370,6 +378,8 @@ function [y_known, y_unknown, flist_known , flist_unknown] = measModel(x, marker
   [QiE, Qie] = eig(S);
 
   for i = 1:szKnown
+    x(1:2).';
+    markers_known(i,:)
     [collide, edge] = checkCollision(x(1:2).', markers_known(i,:), edges);
     if (collide)
       continue;
