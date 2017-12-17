@@ -16,7 +16,7 @@ S0feat_unknown = 100*eye(2*200);
 % 
 % Motion disturbance.
 R = 0.02*ones(5,5);
-R(5,5) = 0;
+R(5,5) = 0.002;
 R(4,4) = 0.002;
 Qi = eye(2) * 0.1;
 
@@ -92,38 +92,84 @@ for t=1:length(T)-1
     end
 %%
 % motion cov update.
-mu(1:5) = x(t+1,:).';
+% mu(1:5) = x(t+1,:).';
+[mu(1:5), next_point, a] = motModel(mu(1:5).', start_point, end_point, v, dt);
 S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
 % Measurement update. 
     for i=1:204
         if (flist(i))
+          if (i < 5)
+          display('found a static point');
+          end
             % Feature initialization
             if (newfeature(i) == 1)
-                mu(5+2*(i-1)+1) = mu(1)+y(2*(i-1)+1);
-                mu(5+2*i) = mu(2)+y(2*i);
+%                 display('new feature');
+                dx = y(2*(i-1)+1);
+                dy = y(2*i);
+                Rot = rot2D(-mu(3));
+                newy = Rot * [dx dy].';
+                mu(5+2*(i-1)+1) = mu(1)+newy(1);
+                mu(5+2*i) = mu(2)+newy(2);
                 newfeature(i) = 0;
             end
             % Linearization
             % Predicted range
-            mu(1) = mu(1) 
-            mu(5+2*(i-1)+1)
-            mu(2)
-            mu(5+2*i)
-            dx = mu(1) - mu(5+2*(i-1)+1);
-            dy = mu(2) - mu(5+2*i);
+%             display('0000000')
+%             x(t+1,3)
+%             mu(3)
+%             x(t+1,1)
+%             mu(1)
+%             x(t+1,2)
+%             mu(2)
+%             
+%             mu(5+2*(i-1)+1)
+%             mu(5+2*i)
+            
+              
+%             S(5+2*i,5+2*i)
+            
+            
+%             plot(mu(5+2*(i-1)+1), mu(5+2*i), 'gx')
+       
+            mu(1:5) - x(t+1,:).'
+            dx = mu(5+2*(i-1)+1) - mu(1);
+            dy = mu(5+2*i) - mu(2);
             Fi = zeros(5,5+408);
             Fi(1:5,1:5) = eye(5);
             Fi(6:7,5+2*(i-1)+1:5+2*i) = eye(2);
-            Ht = [ 1, 0, 0, 0, 0, -1,  0;
-                   0, 1, 0, 0, 0,  0,  -1]*Fi;
-            Ht
-            I = y(2*(i-1)+1:2*i)-[dx dy].';
-            I
- 
+            th = mu(3);
+            rot = rot2D(th);
+            xf = mu(5+2*(i-1)+1);
+            xr = mu(1);
+            yf = mu(5+2*i);
+            yr = mu(2);
+            Ht = [-cos(th), sin(th), (-xf*sin(th)+xr*sin(th)-yf*cos(th)+yr*cos(th)), 0, 0,  cos(th), -sin(th),;
+                  -sin(th), -cos(th), (xf*cos(th)-xr*cos(th)-yf*sin(th)+yr*sin(th)), 0, 0,  sin(th), cos(th)]*Fi;
+%             Ht
+            I = y(2*(i-1)+1:2*i)-rot*[dx dy].';
+%             I
+%             mu(3)
+            x(t+1,3)
             % Measurement update
             K = S*Ht'/(Ht*S*Ht'+Qi);
+%             display('before')
+%             mu(3)
+%             mu(5+2*(i-1)+1)
+%             mu(5+2*i)
             mu = mu + K*I;
+            
+%             display('after');
+%             mu(5+2*(i-1)+1)
+%             mu(5+2*i)
+            mu(3) = angleWrap(mu(3));
+%             mu(3)
             S = (eye(5+408)-K*Ht)*S;
+                        % In cases if S bemoes not positive definite, manually make it
+            % P.D.
+            if min(eig(S))<0
+               S=S-eye(length(S)).*min(eig(S));
+               warning('S was manually made positive definite')
+            end
         end
     end
 
@@ -133,12 +179,12 @@ S(1:5,1:5) = a * S(1:5, 1:5) * a' + R;
     %plot(trees(:,1),trees(:,2),'go', 'MarkerSize',10,'LineWidth',2);
 %     plot(xr(1,1:t),xr(3,1:t), 'ro--')
 %     plot([xr(1,t) xr(1,t)+1*cos(yaw)],[xr(3,t) xr(3,t)+1*sin(yaw)], 'r-')
-    plot(mu(1),mu(3), 'bx')
+    plot(mu(1),mu(2), 'rx')
     %plot([mu_S(1,t) mu_S(1,t)+1*cos(yaw)],[mu_S(3,t) mu_S(3,t)+1*sin(yaw)], 'b-')
-    mu_pos = [mu(1) mu(3)];
+    mu_pos = [mu(1) mu(2)];
     S_pos = [S(1,1) S(1,2); S(2,1) S(2,2)];
-    error_ellipse(S_pos,mu_pos,0.75);
-    error_ellipse(S_pos,mu_pos,0.95);
+%     error_ellipse(S_pos,mu_pos,0.75);
+%     error_ellipse(S_pos,mu_pos,0.95);
 %     plot( [mu(1) mu(1)+2*cos(phides)],[mu(3) mu(3)+2*sin(phides)], 'b')
 %     for i=1:204
 %         if (flist(i))
@@ -215,10 +261,12 @@ obsEdges(2,1:2)
 [y_known, y_unknown, flistknown, flistunknown] = measModel([x0; pi/2], known_fiducials, unknown_fiducials, obsEdges)
 %
 hold on
-testY = y_unknown + x0.'
+R= rot2D(-pi/2);
+testY = y_unknown;
 for i=1:length(flistunknown)
   if (flistunknown(i))
-    plot(testY(i,1), testY(i,2), 'b*')
+    testing = R*testY(i,:).' + x0
+    plot(testing(1), testing(2), 'b*')
   end
 end
 %%
@@ -230,7 +278,7 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     delta_max = 25*pi/180; % max steering angle
     k = 2.5; % Gain
     kp = 1;
-    ki = 1;
+    ki = 0.01;
     robot_length = 1; % Car length
 
     v = x(4);
@@ -241,6 +289,8 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     
     % Calculate steering angle
     delta = max(-delta_max,min(delta_max, angleWrap(traj_angle - x(3))+ atan2(-k*crosstrack_error,v)));
+    display('delta')
+    delta
     % State derivatives
 %     xd(1) = v*cos(x(3));
 %     xd(2) = v*sin(x(3));
@@ -259,19 +309,20 @@ function [x_plus, next_point, a] = motModel(x, start_point, end_point, v,dt)
     a(2,3) = dt * x(4) * cos(x(3));
     a(2,4) = dt * sin(x(3));
     a(3,4) = dt * tan(delta/robot_length);
-    a(4,4) = -kp;
-    a(4,5) = -ki;
-    a(5,4) = 1;
-    a(5,5) = -1;
+    a(4,4) = 1;
+    a(5,5) = 1;
+%     a(5,4) = 1;
+    a(5,5) = 1;
     x_plus = a * x.';
-    x_plus(4) = x_plus(4) +  5 * kp + ki * x(5);
-    x_plus(5) = 5*kp + x_plus(5);
-
+    x_plus(4) = 5 + kp*(5-x(4)) + ki * x(5);
+    x_plus(5) = x_plus(5) + ki * (5 - x(4));
 
     % angle wrap the heading + noise.
     x_plus(1) = x_plus(1) + 0.02 * randn();
     x_plus(2) = x_plus(2) + 0.02 * randn();
     x_plus(3) = x_plus(3) + 0.002 * randn();
+    x_plus(4) = x_plus(4) + 0.002 * randn();
+    x_plus(5) = x_plus(5) + 0.002 * randn();
     x_plus(3) = angleWrap(x_plus(3));
 end
 
@@ -329,7 +380,7 @@ function [y_known, y_unknown, flist_known , flist_unknown] = measModel(x, marker
     end
     flist_known(i) = 1;
     d = QiE*sqrt(Qie)*randn(2,1);
-    y_known(i, :) = diff(i,:) + d.';
+    y_known(i, :) = rotated.' + d.';
     
   end
   diff = markers_unknown - x(1:2).';
@@ -344,7 +395,7 @@ function [y_known, y_unknown, flist_known , flist_unknown] = measModel(x, marker
     end
     flist_unknown(i) = 1;
     d = QiE*sqrt(Qie)*randn(2,1);
-    y_unknown(i,:) = diff(i,:) + d.';
+    y_unknown(i,:) = rotated.' + d.';
   end
 
 end
